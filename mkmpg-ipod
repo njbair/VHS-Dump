@@ -1,0 +1,46 @@
+#!/bin/sh
+
+# iPod Nano 2G Conversion Script
+#
+# Convert an H264/AAC video to iPod Nano 2G format
+#
+# script takes 3 arguments:
+#
+#   input file
+#   start time (in seconds) [optional]
+#   end time (in seconds) [optional]
+#
+
+# Configuration Options
+#
+VIDEO_BITRATE="200K"
+AUDIO_BITRATE="128K"
+
+if [ "$1" != "" ]
+then
+	TIME=""
+	if [ "$2" != "" ]
+	then
+		STARTTIME=$2
+		TIME="-ss $STARTTIME"
+		if [ "$3" != "" ]
+		then
+			ENDTIME=$3
+			LENGTH=`echo $ENDTIME - $STARTTIME | bc`
+			TIME="$TIME -t $LENGTH"
+		fi
+	fi
+else
+	echo "Usage: `basename $0` INFILE [STARTTIME [ENDTIME]]"
+	exit 85
+fi
+
+INFILE=$1
+OUTFILE="nano2g.mpg"
+
+# encode the movie
+ffmpeg $TIME -i $INFILE \
+	-s 176x132 \
+	-vcodec mpeg2video -b $VIDEO_BITRATE \
+	-acodec libmp3lame -ab $AUDIO_BITRATE \
+	$OUTFILE

@@ -1,0 +1,11 @@
+#!/bin/bash
+
+v4l2-ctl -i 2 -v width=320,height=240
+
+timeout $2m cat /dev/video0 > $1.mpg & 
+
+while [ ! -f $1.mpg ]; do
+	sleep 1
+done
+
+mplayer $1.mpg

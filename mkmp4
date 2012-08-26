@@ -1,0 +1,74 @@
+#!/bin/sh
+
+# Capture Conversion Script
+#
+# Convert a raw video stream from a video capture card to H264/AAC
+#
+# script takes 3 arguments:
+#
+#   input file
+#   start time (in seconds) [optional]
+#   end time (in seconds) [optional]
+#
+
+# Configuration Options
+#
+VIDEO_FILTERS="yadif,crop=312:236:4:2,scale=320:240"
+VIDEO_FILTERS="$VIDEO_FILTERS,frei0r=gamma:.3"
+#VIDEO_FILTERS="$VIDEO_FILTERS,unsharp=5:5:1:5:5:-1"
+VIDEO_BITRATE="768K"
+AUDIO_BITRATE="128K"
+
+if [ "$1" != "" ]
+then
+	TIME=""
+	if [ "$2" != "" ]
+	then
+		STARTTIME=$2
+		TIME="-ss $STARTTIME"
+		if [ "$3" != "" ]
+		then
+			ENDTIME=$3
+			LENGTH=`echo $ENDTIME - $STARTTIME | bc`
+			TIME="$TIME -t $LENGTH"
+		fi
+	fi
+else
+	echo "Usage: `basename $0` INFILE [STARTTIME [ENDTIME]]"
+	exit 85
+fi
+
+INFILE=$1
+OUTFILE="`basename $INFILE .mpg`.mp4"
+
+# create a time-trimmed copy of the movie to work with
+#
+# this is to prevent bugs present when using two-pass encoding
+# with the -ss and -t options
+if [ "$TIME" != "" ]
+then
+	echo "Creating time-trimmed copy"
+	echo
+	ffmpeg $TIME -i $INFILE \
+		-acodec copy -vcodec copy \
+		-threads 0 trim/`basename $INFILE .mpg`.trim.mpg
+	INFILE="trim/`basename $INFILE .mpg`.trim.mpg"
+fi
+
+# encode the movie
+echo
+echo "Pass 1:"
+echo
+ffmpeg -i $INFILE -y \
+	-vf $VIDEO_FILTERS \
+	-vcodec libx264 -pass 1 -vpre slow_firstpass -b $VIDEO_BITRATE \
+	-an \
+	-threads 0 $OUTFILE
+echo
+echo "Pass 2:"
+echo
+ffmpeg -i $INFILE -y \
+	-vf $VIDEO_FILTERS \
+	-vcodec libx264 -pass 2 -vpre slow -b $VIDEO_BITRATE \
+	-acodec libfaac -ab $AUDIO_BITRATE \
+	-threads 0 $OUTFILE
